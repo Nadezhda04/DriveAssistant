@@ -1,10 +1,8 @@
 package com.example.driveassistant
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.RecognizerIntent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,8 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.driveassistant.speech.SpeechRecognitionManager
 import com.example.driveassistant.ui.theme.DriveAssistantTheme
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
@@ -39,35 +38,53 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf("Няма разпознат текст")
                 }
 
-                val speechLauncher =
-                    rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.StartActivityForResult()
-                    ) { result ->
+                var statusText by remember {
+                    mutableStateOf("Готов")
+                }
 
-                        if (result.resultCode == RESULT_OK) {
-                            val results =
-                                result.data?.getStringArrayListExtra(
-                                    RecognizerIntent.EXTRA_RESULTS
-                                )
+                var isListening by remember {
+                    mutableStateOf(false)
+                }
 
-                            recognizedText =
-                                results?.firstOrNull()
-                                    ?: "Не беше разпознат текст"
+                val speechManager = remember {
+                    SpeechRecognitionManager(
+                        context = this,
+                        onStatusChanged = { status ->
+                            statusText = status
+
+                            isListening = status == "Слушам..." ||
+                                    status == "Разпознавам реч..." ||
+                                    status == "Обработвам..."
+                        },
+                        onPartialResult = { partialText ->
+                            recognizedText = partialText
+                        },
+                        onFinalResult = { finalText ->
+                            recognizedText = finalText
+                            isListening = false
                         }
-                    }
+                    )
+                }
 
                 val permissionLauncher =
                     rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestPermission()
                     ) { granted ->
 
-                        if (!granted) {
-                            recognizedText =
-                                "Нужно е разрешение за микрофона"
+                        if (granted) {
+                            statusText = "Готов"
+                        } else {
+                            statusText = "Няма разрешение за микрофона"
                         }
                     }
 
-                fun startSpeechRecognition() {
+                DisposableEffect(Unit) {
+                    onDispose {
+                        speechManager.destroy()
+                    }
+                }
+
+                fun startListening() {
 
                     val permissionGranted =
                         ContextCompat.checkSelfPermission(
@@ -82,26 +99,10 @@ class MainActivity : ComponentActivity() {
                         return
                     }
 
-                    val intent =
-                        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    recognizedText = ""
+                    statusText = "Стартирам..."
 
-                            putExtra(
-                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                            )
-
-                            putExtra(
-                                RecognizerIntent.EXTRA_LANGUAGE,
-                                "bg-BG"
-                            )
-
-                            putExtra(
-                                RecognizerIntent.EXTRA_PROMPT,
-                                "Кажете бележката"
-                            )
-                        }
-
-                    speechLauncher.launch(intent)
+                    speechManager.startListening()
                 }
 
                 Column(
@@ -118,16 +119,35 @@ class MainActivity : ComponentActivity() {
                     )
 
                     Text(
+                        modifier = Modifier.padding(top = 24.dp),
+                        text = statusText
+                    )
+
+                    Text(
                         modifier = Modifier.padding(vertical = 24.dp),
-                        text = recognizedText
+                        text = if (recognizedText.isBlank()) {
+                            "..."
+                        } else {
+                            recognizedText
+                        }
                     )
 
                     Button(
                         onClick = {
-                            startSpeechRecognition()
+                            if (isListening) {
+                                speechManager.stopListening()
+                            } else {
+                                startListening()
+                            }
                         }
                     ) {
-                        Text("🎤 Говори")
+                        Text(
+                            if (isListening) {
+                                "⏹ Спри"
+                            } else {
+                                "🎤 Говори"
+                            }
+                        )
                     }
                 }
             }
