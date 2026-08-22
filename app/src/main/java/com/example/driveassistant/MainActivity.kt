@@ -3,6 +3,13 @@ package com.example.driveassistant
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -23,13 +30,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.driveassistant.data.AppDatabase
+import com.example.driveassistant.data.VoiceNote
 import com.example.driveassistant.speech.SpeechRecognitionManager
 import com.example.driveassistant.ui.theme.DriveAssistantTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         setContent {
             DriveAssistantTheme {
@@ -45,6 +57,20 @@ class MainActivity : ComponentActivity() {
                 var isListening by remember {
                     mutableStateOf(false)
                 }
+
+                val coroutineScope = rememberCoroutineScope()
+
+                val database = remember {
+                    AppDatabase.getInstance(this)
+                }
+
+                val voiceNoteDao = remember {
+                    database.voiceNoteDao()
+                }
+
+                val notes by voiceNoteDao
+                    .getAllNotes()
+                    .collectAsState(initial = emptyList())
 
                 val speechManager = remember {
                     SpeechRecognitionManager(
@@ -62,6 +88,16 @@ class MainActivity : ComponentActivity() {
                         onFinalResult = { finalText ->
                             recognizedText = finalText
                             isListening = false
+
+                            if (finalText.isNotBlank()) {
+                                coroutineScope.launch {
+                                    voiceNoteDao.insert(
+                                        VoiceNote(
+                                            text = finalText
+                                        )
+                                    )
+                                }
+                            }
                         }
                     )
                 }
@@ -109,7 +145,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
@@ -148,6 +184,31 @@ class MainActivity : ComponentActivity() {
                                 "🎤 Говори"
                             }
                         )
+                    }
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
+
+                    Text(
+                        text = "Запазени бележки",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    LazyColumn {
+                        items(
+                            items = notes,
+                            key = { note -> note.id }
+                        ) { note ->
+
+                            Text(
+                                text = note.text,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
                     }
                 }
             }
