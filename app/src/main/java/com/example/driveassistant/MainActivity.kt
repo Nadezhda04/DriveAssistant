@@ -31,11 +31,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import com.example.driveassistant.data.AppDatabase
 import com.example.driveassistant.data.VoiceNote
 import com.example.driveassistant.speech.SpeechRecognitionManager
 import com.example.driveassistant.ui.theme.DriveAssistantTheme
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.car.app.connection.CarConnection
+import com.example.driveassistant.carconnection.CarConnectionManager
 
 class MainActivity : ComponentActivity() {
 
@@ -45,6 +53,26 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             DriveAssistantTheme {
+                val carConnectionManager = remember {
+                    CarConnectionManager(this)
+                }
+
+                val connectionType by carConnectionManager
+                    .connectionType
+                    .observeAsState(
+                        initial = CarConnection.CONNECTION_TYPE_NOT_CONNECTED
+                    )
+
+                val carConnectionText = when (connectionType) {
+                    CarConnection.CONNECTION_TYPE_PROJECTION ->
+                        "Android Auto: свързан"
+
+                    CarConnection.CONNECTION_TYPE_NATIVE ->
+                        "Android Automotive: свързан"
+
+                    else ->
+                        "Автомобил: няма връзка"
+                }
 
                 var recognizedText by remember {
                     mutableStateOf("Няма разпознат текст")
@@ -155,6 +183,11 @@ class MainActivity : ComponentActivity() {
                     )
 
                     Text(
+                        text = carConnectionText,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    Text(
                         modifier = Modifier.padding(top = 24.dp),
                         text = statusText
                     )
@@ -189,6 +222,20 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.height(32.dp)
                     )
 
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                voiceNoteDao.insert(
+                                    VoiceNote(
+                                        text = "Тестова бележка от emulator"
+                                    )
+                                )
+                            }
+                        }
+                    ) {
+                        Text("Добави тестова бележка")
+                    }
+
                     Text(
                         text = "Запазени бележки",
                         style = MaterialTheme.typography.titleMedium
@@ -199,15 +246,51 @@ class MainActivity : ComponentActivity() {
                     )
 
                     LazyColumn {
+
                         items(
                             items = notes,
                             key = { note -> note.id }
                         ) { note ->
+                            val formattedDate = remember(note.createdAt) {
+                                SimpleDateFormat(
+                                    "dd.MM.yyyy HH:mm",
+                                    Locale("bg", "BG")
+                                ).format(Date(note.createdAt))
+                            }
 
-                            Text(
-                                text = note.text,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = note.text,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+
+                                    Text(
+                                        text = formattedDate,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            voiceNoteDao.delete(note)
+                                        }
+                                    }
+                                ) {
+                                    Text("Изтрий")
+                                }
+
+
+                            }
                         }
                     }
                 }
