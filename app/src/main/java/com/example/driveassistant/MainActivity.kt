@@ -44,6 +44,7 @@ import java.util.Locale
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.car.app.connection.CarConnection
 import com.example.driveassistant.carconnection.CarConnectionManager
+import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
 
@@ -62,6 +63,13 @@ class MainActivity : ComponentActivity() {
                     .observeAsState(
                         initial = CarConnection.CONNECTION_TYPE_NOT_CONNECTED
                     )
+                var wasConnectedToAndroidAuto by remember {
+                    mutableStateOf(false)
+                }
+
+                var tripStatusText by remember {
+                    mutableStateOf("")
+                }
 
                 val carConnectionText = when (connectionType) {
                     CarConnection.CONNECTION_TYPE_PROJECTION ->
@@ -148,6 +156,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(connectionType) {
+
+                    when (connectionType) {
+
+                        CarConnection.CONNECTION_TYPE_PROJECTION -> {
+                            wasConnectedToAndroidAuto = true
+                            tripStatusText = "Пътуването е активно"
+                        }
+
+                        CarConnection.CONNECTION_TYPE_NOT_CONNECTED -> {
+
+                            if (wasConnectedToAndroidAuto) {
+                                tripStatusText = "Пътуването приключи"
+                                wasConnectedToAndroidAuto = false
+                            }
+                        }
+                    }
+                }
+
                 fun startListening() {
 
                     val permissionGranted =
@@ -186,6 +213,13 @@ class MainActivity : ComponentActivity() {
                         text = carConnectionText,
                         modifier = Modifier.padding(top = 8.dp)
                     )
+
+                    if (tripStatusText.isNotBlank()) {
+                        Text(
+                            text = tripStatusText,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
 
                     Text(
                         modifier = Modifier.padding(top = 24.dp),
