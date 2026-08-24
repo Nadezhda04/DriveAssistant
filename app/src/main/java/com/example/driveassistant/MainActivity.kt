@@ -3,6 +3,13 @@ package com.example.driveassistant
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -23,16 +30,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import com.example.driveassistant.data.AppDatabase
+import com.example.driveassistant.data.VoiceNote
 import com.example.driveassistant.speech.SpeechRecognitionManager
 import com.example.driveassistant.ui.theme.DriveAssistantTheme
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.car.app.connection.CarConnection
+import com.example.driveassistant.carconnection.CarConnectionManager
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+
         setContent {
             DriveAssistantTheme {
+                val carConnectionManager = remember {
+                    CarConnectionManager(this)
+                }
+
+                val connectionType by carConnectionManager
+                    .connectionType
+                    .observeAsState(
+                        initial = CarConnection.CONNECTION_TYPE_NOT_CONNECTED
+                    )
+
+                val carConnectionText = when (connectionType) {
+                    CarConnection.CONNECTION_TYPE_PROJECTION ->
+                        "Android Auto: свързан"
+
+                    CarConnection.CONNECTION_TYPE_NATIVE ->
+                        "Android Automotive: свързан"
+
+                    else ->
+                        "Автомобил: няма връзка"
+                }
 
                 var recognizedText by remember {
                     mutableStateOf("Няма разпознат текст")
@@ -45,6 +85,20 @@ class MainActivity : ComponentActivity() {
                 var isListening by remember {
                     mutableStateOf(false)
                 }
+
+                val coroutineScope = rememberCoroutineScope()
+
+                val database = remember {
+                    AppDatabase.getInstance(this)
+                }
+
+                val voiceNoteDao = remember {
+                    database.voiceNoteDao()
+                }
+
+                val notes by voiceNoteDao
+                    .getAllNotes()
+                    .collectAsState(initial = emptyList())
 
                 val speechManager = remember {
                     SpeechRecognitionManager(
@@ -62,6 +116,16 @@ class MainActivity : ComponentActivity() {
                         onFinalResult = { finalText ->
                             recognizedText = finalText
                             isListening = false
+
+                            if (finalText.isNotBlank()) {
+                                coroutineScope.launch {
+                                    voiceNoteDao.insert(
+                                        VoiceNote(
+                                            text = finalText
+                                        )
+                                    )
+                                }
+                            }
                         }
                     )
                 }
@@ -109,13 +173,18 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
                     Text(
                         text = "Drive Assistant",
                         style = MaterialTheme.typography.headlineMedium
+                    )
+
+                    Text(
+                        text = carConnectionText,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
 
                     Text(
@@ -148,6 +217,81 @@ class MainActivity : ComponentActivity() {
                                 "🎤 Говори"
                             }
                         )
+                    }
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                voiceNoteDao.insert(
+                                    VoiceNote(
+                                        text = "Тестова бележка от emulator"
+                                    )
+                                )
+                            }
+                        }
+                    ) {
+                        Text("Добави тестова бележка")
+                    }
+
+                    Text(
+                        text = "Запазени бележки",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    LazyColumn {
+
+                        items(
+                            items = notes,
+                            key = { note -> note.id }
+                        ) { note ->
+                            val formattedDate = remember(note.createdAt) {
+                                SimpleDateFormat(
+                                    "dd.MM.yyyy HH:mm",
+                                    Locale("bg", "BG")
+                                ).format(Date(note.createdAt))
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = note.text,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+
+                                    Text(
+                                        text = formattedDate,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            voiceNoteDao.delete(note)
+                                        }
+                                    }
+                                ) {
+                                    Text("Изтрий")
+                                }
+
+
+                            }
+                        }
                     }
                 }
             }
