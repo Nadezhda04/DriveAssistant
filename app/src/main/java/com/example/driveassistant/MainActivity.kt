@@ -2,6 +2,7 @@ package com.example.driveassistant
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,10 +23,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -45,31 +44,67 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.car.app.connection.CarConnection
 import com.example.driveassistant.carconnection.CarConnectionManager
 import androidx.compose.runtime.LaunchedEffect
-
+import com.example.driveassistant.notification.NotificationHelper
+import android.content.Intent
+import com.example.driveassistant.trip.TripMonitoringService
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val tripServiceIntent =
+            Intent(
+                this,
+                TripMonitoringService::class.java
+            )
+
+        ContextCompat.startForegroundService(
+            this,
+            tripServiceIntent
+        )
 
         setContent {
             DriveAssistantTheme {
+
                 val carConnectionManager = remember {
                     CarConnectionManager(this)
                 }
+
+                val notificationHelper = remember {
+                    NotificationHelper(this)
+                }
+
+                val notificationPermissionLauncher =
+                    rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.RequestPermission()
+                    ) {
+                    }
+
+                LaunchedEffect(Unit) {
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+                        val permissionGranted =
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                        if (!permissionGranted) {
+                            notificationPermissionLauncher.launch(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            )
+                        }
+                    }
+                }
+
+
 
                 val connectionType by carConnectionManager
                     .connectionType
                     .observeAsState(
                         initial = CarConnection.CONNECTION_TYPE_NOT_CONNECTED
                     )
-                var wasConnectedToAndroidAuto by remember {
-                    mutableStateOf(false)
-                }
-
-                var tripStatusText by remember {
-                    mutableStateOf("")
-                }
 
                 val carConnectionText = when (connectionType) {
                     CarConnection.CONNECTION_TYPE_PROJECTION ->
@@ -156,25 +191,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(connectionType) {
-
-                    when (connectionType) {
-
-                        CarConnection.CONNECTION_TYPE_PROJECTION -> {
-                            wasConnectedToAndroidAuto = true
-                            tripStatusText = "Пътуването е активно"
-                        }
-
-                        CarConnection.CONNECTION_TYPE_NOT_CONNECTED -> {
-
-                            if (wasConnectedToAndroidAuto) {
-                                tripStatusText = "Пътуването приключи"
-                                wasConnectedToAndroidAuto = false
-                            }
-                        }
-                    }
-                }
-
                 fun startListening() {
 
                     val permissionGranted =
@@ -213,13 +229,6 @@ class MainActivity : ComponentActivity() {
                         text = carConnectionText,
                         modifier = Modifier.padding(top = 8.dp)
                     )
-
-                    if (tripStatusText.isNotBlank()) {
-                        Text(
-                            text = tripStatusText,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
 
                     Text(
                         modifier = Modifier.padding(top = 24.dp),
