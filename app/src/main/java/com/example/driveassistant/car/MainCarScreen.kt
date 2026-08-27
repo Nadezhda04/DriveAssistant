@@ -32,6 +32,9 @@ class MainCarScreen(
             SupervisorJob() + Dispatchers.Main
         )
 
+    private val voiceInputManager =
+        CarVoiceInputManager(carContext)
+
     private var notes: List<VoiceNote> = emptyList()
 
     init {
@@ -75,11 +78,10 @@ class MainCarScreen(
 
         val addTestNoteAction =
             Action.Builder()
-                .setTitle("Тестова бележка")
+                .setTitle("Микрофон")
                 .setOnClickListener {
-                    addTestNote()
-                }
-                .build()
+                    startVoiceTest()
+                }.build()
 
         return ListTemplate.Builder()
             .setTitle("Drive Assistant")
@@ -97,7 +99,7 @@ class MainCarScreen(
             .build()
     }
 
-    private fun addTestNote() {
+    private fun createNote(text: String) {
         screenScope.launch(Dispatchers.IO) {
 
             val activeTrip =
@@ -106,12 +108,55 @@ class MainCarScreen(
             if (activeTrip != null) {
                 voiceNoteDao.insert(
                     VoiceNote(
-                        text = "Тестова бележка от автомобила",
+                        text = text,
                         tripId = activeTrip.id
                     )
                 )
             }
         }
+    }
+
+    private fun startVoiceTest() {
+
+        var receivedBytes = 0
+
+        voiceInputManager.startRecording(
+
+            onStarted = {
+                android.util.Log.d(
+                    "CarVoiceInput",
+                    "Recording started"
+                )
+            },
+
+            onAudioData = { data ->
+
+                receivedBytes += data.size
+
+                android.util.Log.d(
+                    "CarVoiceInput",
+                    "Received audio bytes: $receivedBytes"
+                )
+
+                // Засега спираме след приблизително
+                // достатъчно аудио за кратък тест.
+                if (receivedBytes >= 32000) {
+                    voiceInputManager.stopRecording()
+
+                    createNote(
+                        "Получен е аудио запис от автомобила"
+                    )
+                }
+            },
+
+            onError = { error ->
+
+                android.util.Log.e(
+                    "CarVoiceInput",
+                    error
+                )
+            }
+        )
     }
 
     private fun formatDate(
