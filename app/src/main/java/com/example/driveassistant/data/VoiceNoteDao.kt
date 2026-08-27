@@ -17,4 +17,11 @@ interface VoiceNoteDao {
 
     @Delete
     suspend fun delete(note: VoiceNote)
+
+    @Query("SELECT COUNT(*) FROM voice_notes WHERE tripId = :tripId")
+    suspend fun countNotesForTrip(tripId: Long): Int
+
+    @Query("SELECT * FROM voice_notes WHERE tripId = :tripId ORDER BY createdAt DESC")
+    suspend fun getNotesForTrip(tripId: Long): List<VoiceNote>
 }
+

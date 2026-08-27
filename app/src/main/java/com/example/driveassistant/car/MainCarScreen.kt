@@ -98,15 +98,19 @@ class MainCarScreen(
     }
 
     private fun addTestNote() {
+        screenScope.launch(Dispatchers.IO) {
 
-        screenScope.launch(
-            Dispatchers.IO
-        ) {
-            voiceNoteDao.insert(
-                VoiceNote(
-                    text = "Тестова бележка от автомобила"
+            val activeTrip =
+                database.tripDao().getActiveTrip()
+
+            if (activeTrip != null) {
+                voiceNoteDao.insert(
+                    VoiceNote(
+                        text = "Тестова бележка от автомобила",
+                        tripId = activeTrip.id
+                    )
                 )
-            )
+            }
         }
     }
 

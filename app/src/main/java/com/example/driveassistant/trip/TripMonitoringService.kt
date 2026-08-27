@@ -10,6 +10,13 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Observer
 import com.example.driveassistant.R
 import com.example.driveassistant.notification.NotificationHelper
+import com.example.driveassistant.data.AppDatabase
+import com.example.driveassistant.data.Trip
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class TripMonitoringService : Service() {
 
@@ -23,23 +30,72 @@ class TripMonitoringService : Service() {
 
     private var wasConnectedToAndroidAuto = false
 
+    private val serviceScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private lateinit var database: AppDatabase
+
+    private var activeTripId: Long? = null
+
     private val connectionObserver = Observer<Int> { connectionType ->
 
         when (connectionType) {
 
             CarConnection.CONNECTION_TYPE_PROJECTION -> {
-                wasConnectedToAndroidAuto = true
+
+                if (!wasConnectedToAndroidAuto) {
+
+                    wasConnectedToAndroidAuto = true
+
+                    serviceScope.launch {
+
+                        val existingTrip =
+                            database.tripDao().getActiveTrip()
+
+                        if (existingTrip != null) {
+                            activeTripId = existingTrip.id
+                        } else {
+
+                            activeTripId =
+                                database.tripDao().insert(
+                                    Trip()
+                                )
+                        }
+                    }
+                }
             }
 
             CarConnection.CONNECTION_TYPE_NOT_CONNECTED -> {
 
                 if (wasConnectedToAndroidAuto) {
 
-                    notificationHelper.showTripEndedNotification(
-                        noteCount = 0
-                    )
-
                     wasConnectedToAndroidAuto = false
+
+                    serviceScope.launch {
+
+                        val trip =
+                            database.tripDao().getActiveTrip()
+
+                        if (trip != null) {
+
+                            database.tripDao().update(
+                                trip.copy(
+                                    endedAt = System.currentTimeMillis()
+                                )
+                            )
+
+                            val noteCount =
+                                database.voiceNoteDao()
+                                    .countNotesForTrip(trip.id)
+
+                            notificationHelper
+                                .showTripEndedNotification(
+                                    noteCount = noteCount
+                                )
+
+                            activeTripId = null
+                        }
+                    }
                 }
             }
         }
@@ -47,6 +103,8 @@ class TripMonitoringService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+
+        database = AppDatabase.getInstance(this)
 
         notificationHelper = NotificationHelper(this)
 
@@ -59,6 +117,7 @@ class TripMonitoringService : Service() {
 
     override fun onDestroy() {
         carConnection.type.removeObserver(connectionObserver)
+        serviceScope.cancel()
         super.onDestroy()
     }
 

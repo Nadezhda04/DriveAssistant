@@ -3,14 +3,12 @@ package com.example.driveassistant.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "voice_notes")
-data class VoiceNote(
+@Entity(tableName = "trips")
+data class Trip(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
 
-    val text: String,
+    val startedAt: Long = System.currentTimeMillis(),
 
-    val createdAt: Long = System.currentTimeMillis(),
-
-    val tripId: Long? = null
+    val endedAt: Long? = null
 )
