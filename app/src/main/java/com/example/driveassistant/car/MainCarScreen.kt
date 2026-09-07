@@ -1,21 +1,28 @@
 package com.example.driveassistant.car
 
+import android.content.Intent
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.lifecycle.Observer
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.example.driveassistant.data.AppDatabase
 import com.example.driveassistant.data.VoiceNote
+import com.example.driveassistant.speech.VoiceRecognitionService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainCarScreen(
     carContext: CarContext
@@ -32,16 +39,15 @@ class MainCarScreen(
             SupervisorJob() + Dispatchers.Main
         )
 
-    private val voiceInputManager =
-        CarVoiceInputManager(carContext)
-
-    private var notes: List<VoiceNote> = emptyList()
+    private var notes: List<VoiceNote> =
+        emptyList()
 
     init {
         screenScope.launch {
             voiceNoteDao
                 .getAllNotes()
                 .collectLatest { newNotes ->
+
                     notes = newNotes
                     invalidate()
                 }
@@ -53,22 +59,29 @@ class MainCarScreen(
         val itemListBuilder =
             ItemList.Builder()
 
-        notes.take(10).forEach { note ->
+        notes
+            .take(10)
+            .forEach { note ->
 
-            itemListBuilder.addItem(
-                Row.Builder()
-                    .setTitle(note.text)
-                    .addText(
-                        formatDate(note.createdAt)
-                    )
-                    .build()
-            )
-        }
+                itemListBuilder.addItem(
+                    Row.Builder()
+                        .setTitle(note.text)
+                        .addText(
+                            formatDate(
+                                note.createdAt
+                            )
+                        )
+                        .build()
+                )
+            }
 
         if (notes.isEmpty()) {
+
             itemListBuilder.addItem(
                 Row.Builder()
-                    .setTitle("Няма запазени бележки")
+                    .setTitle(
+                        "Няма запазени бележки"
+                    )
                     .addText(
                         "Добавете бележка от автомобила."
                     )
@@ -76,12 +89,20 @@ class MainCarScreen(
             )
         }
 
-        val addTestNoteAction =
+        val microphoneAction =
             Action.Builder()
-                .setTitle("Микрофон")
+                .setIcon(
+                    CarIcon.Builder(
+                        IconCompat.createWithResource(
+                            carContext,
+                            android.R.drawable.ic_btn_speak_now
+                        )
+                    ).build()
+                )
                 .setOnClickListener {
-                    startVoiceTest()
-                }.build()
+                    startVoiceRecognition()
+                }
+                .build()
 
         return ListTemplate.Builder()
             .setTitle("Drive Assistant")
@@ -93,69 +114,25 @@ class MainCarScreen(
             )
             .setActionStrip(
                 ActionStrip.Builder()
-                    .addAction(addTestNoteAction)
+                    .addAction(
+                        microphoneAction
+                    )
                     .build()
             )
             .build()
     }
 
-    private fun createNote(text: String) {
-        screenScope.launch(Dispatchers.IO) {
+    private fun startVoiceRecognition() {
 
-            val activeTrip =
-                database.tripDao().getActiveTrip()
+        val intent =
+            android.content.Intent(
+                carContext,
+                com.example.driveassistant.speech.VoiceRecognitionService::class.java
+            )
 
-            if (activeTrip != null) {
-                voiceNoteDao.insert(
-                    VoiceNote(
-                        text = text,
-                        tripId = activeTrip.id
-                    )
-                )
-            }
-        }
-    }
-
-    private fun startVoiceTest() {
-
-        var receivedBytes = 0
-
-        voiceInputManager.startRecording(
-
-            onStarted = {
-                android.util.Log.d(
-                    "CarVoiceInput",
-                    "Recording started"
-                )
-            },
-
-            onAudioData = { data ->
-
-                receivedBytes += data.size
-
-                android.util.Log.d(
-                    "CarVoiceInput",
-                    "Received audio bytes: $receivedBytes"
-                )
-
-                // Засега спираме след приблизително
-                // достатъчно аудио за кратък тест.
-                if (receivedBytes >= 32000) {
-                    voiceInputManager.stopRecording()
-
-                    createNote(
-                        "Получен е аудио запис от автомобила"
-                    )
-                }
-            },
-
-            onError = { error ->
-
-                android.util.Log.e(
-                    "CarVoiceInput",
-                    error
-                )
-            }
+        androidx.core.content.ContextCompat.startForegroundService(
+            carContext,
+            intent
         )
     }
 
@@ -164,16 +141,13 @@ class MainCarScreen(
     ): String {
 
         val formatter =
-            java.text.SimpleDateFormat(
+            SimpleDateFormat(
                 "dd.MM.yyyy HH:mm",
-                java.util.Locale(
-                    "bg",
-                    "BG"
-                )
+                Locale("bg", "BG")
             )
 
         return formatter.format(
-            java.util.Date(timestamp)
+            Date(timestamp)
         )
     }
 }
