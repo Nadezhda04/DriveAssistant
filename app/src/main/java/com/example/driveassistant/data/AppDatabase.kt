@@ -6,13 +6,18 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [VoiceNote::class],
-    version = 1,
+    entities = [
+        VoiceNote::class,
+        Trip::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun voiceNoteDao(): VoiceNoteDao
+
+    abstract fun tripDao(): TripDao
 
     companion object {
 
@@ -26,7 +31,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "drive_assistant_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
 
                 INSTANCE = instance
                 instance
