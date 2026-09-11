@@ -42,6 +42,8 @@ class MainCarScreen(
     private var notes: List<VoiceNote> =
         emptyList()
 
+    private var isListening = false
+
     init {
         screenScope.launch {
             voiceNoteDao
@@ -49,6 +51,16 @@ class MainCarScreen(
                 .collectLatest { newNotes ->
 
                     notes = newNotes
+                    invalidate()
+                }
+        }
+        screenScope.launch {
+
+            VoiceRecognitionService
+                .isListening
+                .collectLatest { listening ->
+
+                    isListening = listening
                     invalidate()
                 }
         }
@@ -105,7 +117,12 @@ class MainCarScreen(
                 .build()
 
         return ListTemplate.Builder()
-            .setTitle("Drive Assistant")
+            .setTitle(
+                if (isListening)
+                    "🎤 Слушам..."
+                else
+                    "Drive Assistant"
+            )
             .setSingleList(
                 itemListBuilder.build()
             )

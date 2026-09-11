@@ -3,6 +3,7 @@ package com.example.driveassistant.speech
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
@@ -20,11 +21,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Calendar
 import java.util.Locale
-import android.app.PendingIntent
 
 class VoiceRecognitionService : Service() {
+
+    companion object {
+        val isListening = MutableStateFlow(false)
+    }
 
     private var speechRecognizer: SpeechRecognizer? = null
 
@@ -62,10 +67,12 @@ class VoiceRecognitionService : Service() {
             object : RecognitionListener {
 
                 override fun onReadyForSpeech(params: Bundle?) {
+                    isListening.value = true
                     Log.d(
                         "VoiceRecognitionService",
                         "Слушам..."
                     )
+
                 }
 
                 override fun onBeginningOfSpeech() {
@@ -80,6 +87,7 @@ class VoiceRecognitionService : Service() {
                 override fun onBufferReceived(buffer: ByteArray?) {}
 
                 override fun onEndOfSpeech() {
+                    isListening.value = false
                     Log.d(
                         "VoiceRecognitionService",
                         "Обработвам..."
@@ -87,7 +95,7 @@ class VoiceRecognitionService : Service() {
                 }
 
                 override fun onError(error: Int) {
-
+                    isListening.value = false
                     Log.e(
                         "VoiceRecognitionService",
                         "Speech error: $error"
@@ -97,7 +105,7 @@ class VoiceRecognitionService : Service() {
                 }
 
                 override fun onResults(results: Bundle?) {
-
+                    isListening.value = false
                     val matches =
                         results?.getStringArrayList(
                             SpeechRecognizer.RESULTS_RECOGNITION
@@ -209,7 +217,9 @@ class VoiceRecognitionService : Service() {
                             "${calendarEvent.startTime}"
                 )
 
-                showCalendarNotification(calendarEvent)
+                showCalendarNotification(
+                    calendarEvent
+                )
             }
 
             stopSelf()
@@ -230,9 +240,7 @@ class VoiceRecognitionService : Service() {
 
         var dateFound = false
 
-        /*
-         * ДНЕС
-         */
+        // ДНЕС
         if (
             Regex("\\bднес\\b")
                 .containsMatchIn(text)
@@ -240,9 +248,7 @@ class VoiceRecognitionService : Service() {
             dateFound = true
         }
 
-        /*
-         * УТРЕ
-         */
+        // УТРЕ
         if (
             Regex("\\bутре\\b")
                 .containsMatchIn(text)
@@ -256,9 +262,99 @@ class VoiceRecognitionService : Service() {
             dateFound = true
         }
 
-        /*
-         * НА 12 СЕПТЕМВРИ
-         */
+        // СЛЕДВАЩИЯ ПОНЕДЕЛНИК / ВТОРНИК...
+        val weekdays =
+            mapOf(
+                "понеделник" to Calendar.MONDAY,
+                "вторник" to Calendar.TUESDAY,
+                "сряда" to Calendar.WEDNESDAY,
+                "четвъртък" to Calendar.THURSDAY,
+                "петък" to Calendar.FRIDAY,
+                "събота" to Calendar.SATURDAY,
+                "неделя" to Calendar.SUNDAY
+            )
+
+        val weekdayRegex =
+            Regex(
+                """следващ(?:ия|ият|ата|ото)\s+(понеделник|вторник|сряда|четвъртък|петък|събота|неделя)"""
+            )
+
+        val weekdayMatch =
+            weekdayRegex.find(text)
+
+        if (weekdayMatch != null) {
+
+            val weekdayName =
+                weekdayMatch.groupValues[1]
+
+            val targetDay =
+                weekdays[weekdayName]
+
+            if (targetDay != null) {
+
+                val currentDay =
+                    calendar.get(
+                        Calendar.DAY_OF_WEEK
+                    )
+
+                var daysToAdd =
+                    targetDay - currentDay
+
+                if (daysToAdd <= 0) {
+                    daysToAdd += 7
+                }
+
+                calendar.add(
+                    Calendar.DAY_OF_MONTH,
+                    daysToAdd
+                )
+
+                dateFound = true
+            }
+        }
+
+        // В ПОНЕДЕЛНИК / ВЪВ ВТОРНИК...
+        if (!dateFound) {
+
+            val simpleWeekdayRegex =
+                Regex(
+                    """\b(?:в|във)\s+(понеделник|вторник|сряда|четвъртък|петък|събота|неделя)\b"""
+                )
+
+            val simpleWeekdayMatch =
+                simpleWeekdayRegex.find(text)
+
+            if (simpleWeekdayMatch != null) {
+
+                val weekdayName =
+                    simpleWeekdayMatch.groupValues[1]
+
+                val targetDay =
+                    weekdays[weekdayName]
+
+                if (targetDay != null) {
+
+                    val currentDay =
+                        calendar.get(Calendar.DAY_OF_WEEK)
+
+                    var daysToAdd =
+                        targetDay - currentDay
+
+                    if (daysToAdd <= 0) {
+                        daysToAdd += 7
+                    }
+
+                    calendar.add(
+                        Calendar.DAY_OF_MONTH,
+                        daysToAdd
+                    )
+
+                    dateFound = true
+                }
+            }
+        }
+
+        // НА 12 СЕПТЕМВРИ
         val months =
             mapOf(
                 "януари" to Calendar.JANUARY,
@@ -290,12 +386,10 @@ class VoiceRecognitionService : Service() {
                     .groupValues[1]
                     .toIntOrNull()
 
-            val monthName =
-                dateMatch
-                    .groupValues[2]
-
             val month =
-                months[monthName]
+                months[
+                    dateMatch.groupValues[2]
+                ]
 
             if (
                 day != null &&
@@ -306,34 +400,18 @@ class VoiceRecognitionService : Service() {
                     Calendar.getInstance()
 
                 calendar.set(
-                    Calendar.DAY_OF_MONTH,
-                    day
-                )
-
-                calendar.set(
                     Calendar.MONTH,
                     month
                 )
 
-                /*
-                 * Ако датата за тази година вече е минала,
-                 * приемаме следващата година.
-                 */
-                val testDate =
-                    calendar.clone() as Calendar
-
-                testDate.set(
-                    Calendar.HOUR_OF_DAY,
-                    23
+                calendar.set(
+                    Calendar.DAY_OF_MONTH,
+                    day
                 )
 
-                testDate.set(
-                    Calendar.MINUTE,
-                    59
-                )
-
-                if (testDate.before(now)) {
-
+                if (
+                    calendar.before(now)
+                ) {
                     calendar.add(
                         Calendar.YEAR,
                         1
@@ -344,17 +422,60 @@ class VoiceRecognitionService : Service() {
             }
         }
 
-        /*
-         * ЧАС:
-         *
-         * "в 15:30"
-         * "15:30"
-         * "в 9 часа"
-         */
+        // НА 12-ТИ
+        val dayOnlyRegex =
+            Regex(
+                """\bна\s+(\d{1,2})(?:-?ти|-?ри|-?ви|-?ми)?\b"""
+            )
+
+        val dayOnlyMatch =
+            dayOnlyRegex.find(text)
+
+        if (
+            dayOnlyMatch != null &&
+            dateMatch == null
+        ) {
+
+            val day =
+                dayOnlyMatch
+                    .groupValues[1]
+                    .toIntOrNull()
+
+            if (
+                day != null &&
+                day in 1..31
+            ) {
+
+                val now =
+                    Calendar.getInstance()
+
+                calendar.set(
+                    Calendar.DAY_OF_MONTH,
+                    day
+                )
+
+                if (
+                    calendar.before(now)
+                ) {
+                    calendar.add(
+                        Calendar.MONTH,
+                        1
+                    )
+
+                    calendar.set(
+                        Calendar.DAY_OF_MONTH,
+                        day
+                    )
+                }
+
+                dateFound = true
+            }
+        }
 
         var hour: Int? = null
         var minute: Int? = null
 
+        // 15:30
         val timeWithColon =
             Regex(
                 """(?:\bв\s+)?(\d{1,2}):(\d{2})\b"""
@@ -373,24 +494,76 @@ class VoiceRecognitionService : Service() {
                     .toIntOrNull()
         }
 
+        // В 9 ЧАСА
         if (hour == null) {
 
-            val hourRegex =
+            val numericHourMatch =
                 Regex(
                     """\bв\s+(\d{1,2})\s*(?:часа|час)?\b"""
-                )
+                ).find(text)
 
-            val hourMatch =
-                hourRegex.find(text)
-
-            if (hourMatch != null) {
+            if (numericHourMatch != null) {
 
                 hour =
-                    hourMatch
+                    numericHourMatch
                         .groupValues[1]
                         .toIntOrNull()
 
                 minute = 0
+            }
+        }
+
+        // В ПЕТ И ПОЛОВИНА
+        if (hour == null) {
+
+            val wordHours =
+                mapOf(
+                    "един" to 1,
+                    "едно" to 1,
+                    "два" to 2,
+                    "две" to 2,
+                    "три" to 3,
+                    "четири" to 4,
+                    "пет" to 5,
+                    "шест" to 6,
+                    "седем" to 7,
+                    "осем" to 8,
+                    "девет" to 9,
+                    "десет" to 10,
+                    "единадесет" to 11,
+                    "дванадесет" to 12,
+                    "тринадесет" to 13,
+                    "четиринадесет" to 14,
+                    "петнадесет" to 15,
+                    "шестнадесет" to 16,
+                    "седемнадесет" to 17,
+                    "осемнадесет" to 18,
+                    "деветнадесет" to 19,
+                    "двадесет" to 20
+                )
+
+            val halfPastRegex =
+                Regex(
+                    """\bв\s+([а-я]+)\s+и\s+половина\b"""
+                )
+
+            val halfPastMatch =
+                halfPastRegex.find(text)
+
+            if (halfPastMatch != null) {
+
+                val hourWord =
+                    halfPastMatch
+                        .groupValues[1]
+
+                val parsedHour =
+                    wordHours[hourWord]
+
+                if (parsedHour != null) {
+
+                    hour = parsedHour
+                    minute = 30
+                }
             }
         }
 
@@ -453,36 +626,71 @@ class VoiceRecognitionService : Service() {
     ): String {
 
         return text
+
             .replace(
                 Regex("\\bднес\\b"),
                 ""
             )
+
             .replace(
                 Regex("\\bутре\\b"),
                 ""
             )
+
+            .replace(
+                Regex(
+                    """следващ(?:ия|ият|ата|ото)\s+(понеделник|вторник|сряда|четвъртък|петък|събота|неделя)"""
+                ),
+                ""
+            )
+
+            .replace(
+                Regex(
+                    """\b(?:в|във)\s+(понеделник|вторник|сряда|четвъртък|петък|събота|неделя)\b"""
+                ),
+                ""
+            )
+
             .replace(
                 Regex(
                     """(?:на\s+)?\d{1,2}\s+(януари|февруари|март|април|май|юни|юли|август|септември|октомври|ноември|декември)"""
                 ),
                 ""
             )
+
+            .replace(
+                Regex(
+                    """\bна\s+\d{1,2}(?:-?ти|-?ри|-?ви|-?ми)?\b"""
+                ),
+                ""
+            )
+
             .replace(
                 Regex(
                     """(?:\bв\s+)?\d{1,2}:\d{2}\b"""
                 ),
                 ""
             )
+
             .replace(
                 Regex(
                     """\bв\s+\d{1,2}\s*(?:часа|час)?\b"""
                 ),
                 ""
             )
+
+            .replace(
+                Regex(
+                    """\bв\s+[а-я]+\s+и\s+половина\b"""
+                ),
+                ""
+            )
+
             .replace(
                 Regex("\\s+"),
                 " "
             )
+
             .trim()
     }
 
@@ -491,13 +699,18 @@ class VoiceRecognitionService : Service() {
     ) {
 
         val endTime =
-            event.startTime + 60 * 60 * 1000
+            event.startTime +
+                    60 * 60 * 1000
 
         val calendarIntent =
-            Intent(Intent.ACTION_INSERT).apply {
+            Intent(
+                Intent.ACTION_INSERT
+            ).apply {
 
                 data =
-                    CalendarContract.Events.CONTENT_URI
+                    CalendarContract
+                        .Events
+                        .CONTENT_URI
 
                 putExtra(
                     CalendarContract.EXTRA_EVENT_BEGIN_TIME,
@@ -527,7 +740,10 @@ class VoiceRecognitionService : Service() {
         val channelId =
             "calendar_suggestions"
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
 
             val channel =
                 NotificationChannel(
@@ -538,7 +754,9 @@ class VoiceRecognitionService : Service() {
 
             getSystemService(
                 NotificationManager::class.java
-            ).createNotificationChannel(channel)
+            ).createNotificationChannel(
+                channel
+            )
         }
 
         val notification =
@@ -588,7 +806,9 @@ class VoiceRecognitionService : Service() {
 
             getSystemService(
                 NotificationManager::class.java
-            ).createNotificationChannel(channel)
+            ).createNotificationChannel(
+                channel
+            )
         }
 
         return Notification.Builder(
@@ -608,7 +828,7 @@ class VoiceRecognitionService : Service() {
     }
 
     override fun onDestroy() {
-
+        isListening.value = false
         speechRecognizer?.destroy()
         speechRecognizer = null
 

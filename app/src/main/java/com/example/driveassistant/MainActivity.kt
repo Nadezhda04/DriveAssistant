@@ -104,6 +104,10 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf("")
                 }
 
+                var noteToDelete by remember {
+                    mutableStateOf<VoiceNote?>(null)
+                }
+
                 val tripColors = listOf(
                     Color(0xFFE995B7),
                     Color(0xFFB165B3),
@@ -345,9 +349,7 @@ class MainActivity : ComponentActivity() {
 
                                                 IconButton(
                                                     onClick = {
-                                                        coroutineScope.launch {
-                                                            voiceNoteDao.delete(note)
-                                                        }
+                                                        noteToDelete = note
                                                     }
                                                 ) {
                                                     Icon(
@@ -521,6 +523,49 @@ class MainActivity : ComponentActivity() {
                             TextButton(
                                 onClick = {
                                     noteToEdit = null
+                                }
+                            ) {
+                                Text("Отказ")
+                            }
+                        }
+                    )
+                }
+                if (noteToDelete != null) {
+
+                    AlertDialog(
+                        onDismissRequest = {
+                            noteToDelete = null
+                        },
+
+                        title = {
+                            Text("Изтриване на бележка")
+                        },
+
+                        text = {
+                            Text("Сигурни ли сте, че искате да изтриете тази бележка?")
+                        },
+
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    val note = noteToDelete
+
+                                    if (note != null) {
+                                        coroutineScope.launch {
+                                            voiceNoteDao.delete(note)
+                                            noteToDelete = null
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Изтрий")
+                            }
+                        },
+
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    noteToDelete = null
                                 }
                             ) {
                                 Text("Отказ")
