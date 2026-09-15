@@ -108,6 +108,10 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf<VoiceNote?>(null)
                 }
 
+                var showHome by remember {
+                    mutableStateOf(true)
+                }
+
                 val tripColors = listOf(
                     Color(0xFFE995B7),
                     Color(0xFFB165B3),
@@ -139,20 +143,129 @@ class MainActivity : ComponentActivity() {
                             Text("← Назад")
                         }
 
-                        Text(
-                            text = "Пътуване",
-                            style =
-                                MaterialTheme.typography.headlineMedium
-                        )
+                        // Header
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            shape = RoundedCornerShape(
+                                topStart = 0.dp,
+                                topEnd = 28.dp,
+                                bottomStart = 28.dp,
+                                bottomEnd = 28.dp
+                            ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFF4B183)
+                            )
+                        ) {
+
+                            Column(
+                                modifier = Modifier.padding(20.dp)
+                            ) {
+
+                                Text(
+                                    text = "Пътуване",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = Color.White
+                                )
+
+                                Text(
+                                    text = SimpleDateFormat(
+                                        "dd.MM.yyyy",
+                                        Locale("bg", "BG")
+                                    ).format(
+                                        Date(trip.startedAt)
+                                    ),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color(0xFFFFF7F0)
+                                )
+                            }
+                        }
+
+                        // Информация за пътуването
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 18.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFF3EBDD)
+                            )
+                        ) {
+
+                            Column(
+                                modifier = Modifier.padding(18.dp)
+                            ) {
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        Text(
+                                            text = "Начало",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+
+                                        Text(
+                                            text = formatTime(trip.startedAt),
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                    }
+
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        Text(
+                                            text = "Край",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+
+                                        Text(
+                                            text =
+                                                if (trip.endedAt != null)
+                                                    formatTime(trip.endedAt)
+                                                else
+                                                    "В процес",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "Продължителност",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 16.dp)
+                                )
+
+                                Text(
+                                    text =
+                                        if (trip.endedAt != null)
+                                            formatDuration(
+                                                trip.startedAt,
+                                                trip.endedAt
+                                            )
+                                        else
+                                            "—",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+
+                                Text(
+                                    text = "${tripNotes.size} бележки",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.padding(top = 16.dp)
+                                )
+                            }
+                        }
 
                         Text(
-                            text = formatDate(
-                                trip.startedAt
-                            ),
-                            modifier =
-                                Modifier.padding(
-                                    bottom = 16.dp
-                                )
+                            text = "Бележки",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
 
                         LazyColumn {
@@ -165,39 +278,25 @@ class MainActivity : ComponentActivity() {
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(
-                                            vertical = 6.dp
-                                        ),
-                                    shape =
-                                        RoundedCornerShape(
-                                            20.dp
-                                        )
+                                        .padding(vertical = 6.dp),
+                                    shape = RoundedCornerShape(20.dp)
                                 ) {
 
                                     Column(
-                                        modifier =
-                                            Modifier.padding(
-                                                16.dp
-                                            )
+                                        modifier = Modifier.padding(16.dp)
                                     ) {
 
                                         Text(
                                             text = note.text,
-                                            style =
-                                                MaterialTheme
-                                                    .typography
-                                                    .bodyLarge
+                                            style = MaterialTheme.typography.bodyLarge
                                         )
 
                                         Text(
-                                            text =
-                                                formatDate(
-                                                    note.createdAt
-                                                ),
-                                            style =
-                                                MaterialTheme
-                                                    .typography
-                                                    .bodySmall
+                                            text = formatDate(
+                                                note.createdAt
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(top = 6.dp)
                                         )
                                     }
                                 }
@@ -206,253 +305,373 @@ class MainActivity : ComponentActivity() {
                     }
 
                 } else {
+                    if (showHome) {
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp)
-                    ) {
-                        Card(
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 20.dp),
-                            shape = RoundedCornerShape(
-                                topStart = 0.dp,
-                                topEnd = 28.dp,
-                                bottomStart = 28.dp,
-                                bottomEnd = 28.dp
-                            ),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFF4B183)
-                            )
+                                .fillMaxSize()
+                                .padding(24.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(20.dp)
-                            ) {
-                                Text(
-                                    text = "Drive Assistant",
-                                    style = MaterialTheme.typography.headlineLarge,
-                                    color = Color.White
-                                )
 
-                                Text(
-                                    text = "Вашите бележки от пътуванията",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFFFFF7F0),
-                                    modifier = Modifier.padding(top = 4.dp)
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp),
+                                shape = RoundedCornerShape(
+                                    topStart = 0.dp,
+                                    topEnd = 28.dp,
+                                    bottomStart = 28.dp,
+                                    bottomEnd = 28.dp
+                                ),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFF4B183)
                                 )
+                            ) {
+
+                                Column(
+                                    modifier = Modifier.padding(20.dp)
+                                ) {
+
+                                    Text(
+                                        text = "Drive Assistant",
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        color = Color.White
+                                    )
+
+                                    Text(
+                                        text = "Вашите бележки от пътуванията",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFFFF7F0)
+                                    )
+                                }
+                            }
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .clickable {
+                                        selectedTab = 0
+                                        showHome = false
+                                    },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFF3EBDD)
+                                )
+                            ) {
+
+                                Column(
+                                    modifier = Modifier.padding(24.dp)
+                                ) {
+
+                                    Text(
+                                        text = "📝 Бележки",
+                                        style = MaterialTheme.typography.titleLarge
+                                    )
+
+                                    Text(
+                                        text = "${notes.size} запазени бележки",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    )
+                                }
+                            }
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .clickable {
+                                        selectedTab = 1
+                                        showHome = false
+                                    },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFCDEBDD)
+                                )
+                            ) {
+
+                                Column(
+                                    modifier = Modifier.padding(24.dp)
+                                ) {
+
+                                    Text(
+                                        text = "🚗 Пътувания",
+                                        style = MaterialTheme.typography.titleLarge
+                                    )
+
+                                    Text(
+                                        text =
+                                            "${
+                                                trips.count { trip ->
+                                                    notes.any {
+                                                        it.tripId == trip.id
+                                                    }
+                                                }
+                                            } пътувания",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    )
+                                }
                             }
                         }
 
-                        Row(
+                    } else {
+
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 18.dp),
-                            horizontalArrangement =
-                                Arrangement.spacedBy(8.dp)
+                                .fillMaxSize()
+                                .padding(24.dp)
                         ) {
-                            Button(
+                            TextButton(
                                 onClick = {
-                                    selectedTab = 0
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor =
-                                        if (selectedTab == 0)
-                                            Color(0xFFF4B183)   // apricot
-                                        else
-                                            Color(0xFFF3EBDD),  // light beige
-
-                                    contentColor = Color(0xFF4A443C)
+                                    showHome = true
+                                }
+                            ) {
+                                Text("← Начало")
+                            }
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 20.dp),
+                                shape = RoundedCornerShape(
+                                    topStart = 0.dp,
+                                    topEnd = 28.dp,
+                                    bottomStart = 28.dp,
+                                    bottomEnd = 28.dp
+                                ),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFF4B183)
                                 )
                             ) {
-                                Text("Бележки")
-                            }
-                            Button(
-                                onClick = {
-                                    selectedTab = 1
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor =
-                                        if (selectedTab == 1)
-                                            Color(0xFFF4B183)   // apricot
-                                        else
-                                            Color(0xFFF3EBDD),  // light beige
+                                Column(
+                                    modifier = Modifier.padding(20.dp)
+                                ) {
+                                    Text(
+                                        text = "Drive Assistant",
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        color = Color.White
+                                    )
 
-                                    contentColor = Color(0xFF4A443C)
-                                )
+                                    Text(
+                                        text = "Вашите бележки от пътуванията",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFFFF7F0),
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 18.dp),
+                                horizontalArrangement =
+                                    Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Пътувания")
+                                Button(
+                                    onClick = {
+                                        selectedTab = 0
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor =
+                                            if (selectedTab == 0)
+                                                Color(0xFFF4B183)   // apricot
+                                            else
+                                                Color(0xFFF3EBDD),  // light beige
+
+                                        contentColor = Color(0xFF4A443C)
+                                    )
+                                ) {
+                                    Text("Бележки")
+                                }
+                                Button(
+                                    onClick = {
+                                        selectedTab = 1
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor =
+                                            if (selectedTab == 1)
+                                                Color(0xFFF4B183)   // apricot
+                                            else
+                                                Color(0xFFF3EBDD),  // light beige
+
+                                        contentColor = Color(0xFF4A443C)
+                                    )
+                                ) {
+                                    Text("Пътувания")
+                                }
                             }
-                        }
 
-                        if (selectedTab == 0) {
+                            if (selectedTab == 0) {
 
-                            LazyColumn {
+                                LazyColumn {
 
-                                items(
-                                    items = notes,
-                                    key = { it.id }
-                                ) { note ->
+                                    items(
+                                        items = notes,
+                                        key = { it.id }
+                                    ) { note ->
 
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(
-                                                vertical = 6.dp
-                                            ),
-                                        shape =
-                                            RoundedCornerShape(
-                                                20.dp
-                                            )
-                                    ) {
-
-                                        Column(
-                                            modifier =
-                                                Modifier.padding(
-                                                    16.dp
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    vertical = 6.dp
+                                                ),
+                                            shape =
+                                                RoundedCornerShape(
+                                                    20.dp
                                                 )
                                         ) {
 
-                                            Text(
-                                                text =
-                                                    note.text,
-                                                style =
-                                                    MaterialTheme
-                                                        .typography
-                                                        .bodyLarge
-                                            )
-
-                                            Text(
-                                                text =
-                                                    formatDate(
-                                                        note.createdAt
+                                            Column(
+                                                modifier =
+                                                    Modifier.padding(
+                                                        16.dp
                                                     )
-                                            )
-
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
 
-                                                IconButton(
-                                                    onClick = {
-                                                        noteToEdit = note
-                                                        editedText = note.text
-                                                    }
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Edit,
-                                                        contentDescription = "Редактирай"
-                                                    )
-                                                }
+                                                Text(
+                                                    text =
+                                                        note.text,
+                                                    style =
+                                                        MaterialTheme
+                                                            .typography
+                                                            .bodyLarge
+                                                )
 
-                                                IconButton(
-                                                    onClick = {
-                                                        noteToDelete = note
-                                                    }
+                                                Text(
+                                                    text =
+                                                        formatDate(
+                                                            note.createdAt
+                                                        )
+                                                )
+
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Delete,
-                                                        contentDescription = "Изтрий"
-                                                    )
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            noteToEdit = note
+                                                            editedText = note.text
+                                                        }
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Edit,
+                                                            contentDescription = "Редактирай"
+                                                        )
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            noteToDelete = note
+                                                        }
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Delete,
+                                                            contentDescription = "Изтрий"
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                        } else {
+                            } else {
 
-                            LazyColumn {
+                                LazyColumn {
 
-                                items(
-                                    items = trips.filter { trip ->
-                                        notes.any { note ->
-                                            note.tripId == trip.id
-                                        }
-                                    },
-                                    key = { it.id }
-                                ) { trip ->
+                                    items(
+                                        items = trips.filter { trip ->
+                                            notes.any { note ->
+                                                note.tripId == trip.id
+                                            }
+                                        },
+                                        key = { it.id }
+                                    ) { trip ->
 
-                                    val tripNotes =
-                                        notes.filter {
-                                            it.tripId ==
-                                                    trip.id
-                                        }
+                                        val tripNotes =
+                                            notes.filter {
+                                                it.tripId ==
+                                                        trip.id
+                                            }
 
-                                    val color =
-                                        tripColors[
-                                            (trip.id %
-                                                    tripColors.size)
-                                                .toInt()
-                                        ]
+                                        val color =
+                                            tripColors[
+                                                (trip.id %
+                                                        tripColors.size)
+                                                    .toInt()
+                                            ]
 
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(
-                                                vertical = 8.dp
-                                            )
-                                            .clickable {
-                                                selectedTrip =
-                                                    trip
-                                            },
-                                        shape =
-                                            RoundedCornerShape(
-                                                28.dp
-                                            ),
-                                        colors =
-                                            CardDefaults
-                                                .cardColors(
-                                                    containerColor =
-                                                        color
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    vertical = 8.dp
                                                 )
-                                    ) {
-
-                                        Column(
-                                            modifier =
-                                                Modifier.padding(
-                                                    20.dp
-                                                )
+                                                .clickable {
+                                                    selectedTrip =
+                                                        trip
+                                                },
+                                            shape =
+                                                RoundedCornerShape(
+                                                    28.dp
+                                                ),
+                                            colors =
+                                                CardDefaults
+                                                    .cardColors(
+                                                        containerColor =
+                                                            color
+                                                    )
                                         ) {
 
-                                            Text(
-                                                text =
-                                                    formatDate(
-                                                        trip.startedAt
-                                                    ),
-                                                color =
-                                                    Color.White,
-                                                style =
-                                                    MaterialTheme
-                                                        .typography
-                                                        .titleLarge
-                                            )
-
-                                            Text(
-                                                text =
-                                                    "${tripNotes.size} бележки",
-                                                color =
-                                                    Color.White
-                                            )
-
-                                            tripNotes
-                                                .firstOrNull()
-                                                ?.let { note ->
-
-                                                    Text(
-                                                        text =
-                                                            note.text,
-                                                        color =
-                                                            Color.White,
-                                                        modifier =
-                                                            Modifier.padding(
-                                                                top = 8.dp
-                                                            )
+                                            Column(
+                                                modifier =
+                                                    Modifier.padding(
+                                                        20.dp
                                                     )
-                                                }
+                                            ) {
+
+                                                Text(
+                                                    text =
+                                                        formatDate(
+                                                            trip.startedAt
+                                                        ),
+                                                    color =
+                                                        Color.White,
+                                                    style =
+                                                        MaterialTheme
+                                                            .typography
+                                                            .titleLarge
+                                                )
+
+                                                Text(
+                                                    text =
+                                                        "${tripNotes.size} бележки",
+                                                    color =
+                                                        Color.White
+                                                )
+
+                                                tripNotes
+                                                    .firstOrNull()
+                                                    ?.let { note ->
+
+                                                        Text(
+                                                            text =
+                                                                note.text,
+                                                            color =
+                                                                Color.White,
+                                                            modifier =
+                                                                Modifier.padding(
+                                                                    top = 8.dp
+                                                                )
+                                                        )
+                                                    }
+                                            }
                                         }
                                     }
                                 }
@@ -460,7 +679,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-
                 if (noteToEdit != null) {
 
                     AlertDialog(
@@ -587,5 +805,41 @@ class MainActivity : ComponentActivity() {
         ).format(
             Date(timestamp)
         )
+    }
+
+    private fun formatTime(
+        timestamp: Long
+    ): String {
+
+        return SimpleDateFormat(
+            "HH:mm",
+            Locale("bg", "BG")
+        ).format(
+            Date(timestamp)
+        )
+    }
+
+    private fun formatDuration(
+        startedAt: Long,
+        endedAt: Long
+    ): String {
+
+        val duration =
+            endedAt - startedAt
+
+        val totalMinutes =
+            duration / 60000
+
+        val hours =
+            totalMinutes / 60
+
+        val minutes =
+            totalMinutes % 60
+
+        return if (hours > 0) {
+            "${hours} ч. ${minutes} мин."
+        } else {
+            "${minutes} мин."
+        }
     }
 }

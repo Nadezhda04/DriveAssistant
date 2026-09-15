@@ -20,8 +20,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 
@@ -34,7 +34,9 @@ class VoiceRecognitionService : Service() {
     private var speechRecognizer: SpeechRecognizer? = null
 
     private val serviceScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.IO
+        )
 
     override fun onCreate() {
         super.onCreate()
@@ -56,6 +58,10 @@ class VoiceRecognitionService : Service() {
         return START_NOT_STICKY
     }
 
+    // ----------------------------------------------------
+    // ГЛАСОВО РАЗПОЗНАВАНЕ
+    // ----------------------------------------------------
+
     private fun startRecognition() {
 
         speechRecognizer?.destroy()
@@ -66,36 +72,52 @@ class VoiceRecognitionService : Service() {
         speechRecognizer?.setRecognitionListener(
             object : RecognitionListener {
 
-                override fun onReadyForSpeech(params: Bundle?) {
+                override fun onReadyForSpeech(
+                    params: Bundle?
+                ) {
+
                     isListening.value = true
+
                     Log.d(
                         "VoiceRecognitionService",
                         "Слушам..."
                     )
-
                 }
 
                 override fun onBeginningOfSpeech() {
+
                     Log.d(
                         "VoiceRecognitionService",
                         "Разпознавам..."
                     )
                 }
 
-                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onRmsChanged(
+                    rmsdB: Float
+                ) {
+                }
 
-                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onBufferReceived(
+                    buffer: ByteArray?
+                ) {
+                }
 
                 override fun onEndOfSpeech() {
+
                     isListening.value = false
+
                     Log.d(
                         "VoiceRecognitionService",
                         "Обработвам..."
                     )
                 }
 
-                override fun onError(error: Int) {
+                override fun onError(
+                    error: Int
+                ) {
+
                     isListening.value = false
+
                     Log.e(
                         "VoiceRecognitionService",
                         "Speech error: $error"
@@ -104,8 +126,12 @@ class VoiceRecognitionService : Service() {
                     stopSelf()
                 }
 
-                override fun onResults(results: Bundle?) {
+                override fun onResults(
+                    results: Bundle?
+                ) {
+
                     isListening.value = false
+
                     val matches =
                         results?.getStringArrayList(
                             SpeechRecognizer.RESULTS_RECOGNITION
@@ -122,7 +148,9 @@ class VoiceRecognitionService : Service() {
                     if (!text.isNullOrBlank()) {
 
                         val calendarEvent =
-                            parseCalendarEvent(text)
+                            parseCalendarEvent(
+                                text
+                            )
 
                         saveNote(
                             text = text,
@@ -130,6 +158,7 @@ class VoiceRecognitionService : Service() {
                         )
 
                     } else {
+
                         stopSelf()
                     }
                 }
@@ -139,9 +168,10 @@ class VoiceRecognitionService : Service() {
                 ) {
 
                     val matches =
-                        partialResults?.getStringArrayList(
-                            SpeechRecognizer.RESULTS_RECOGNITION
-                        )
+                        partialResults
+                            ?.getStringArrayList(
+                                SpeechRecognizer.RESULTS_RECOGNITION
+                            )
 
                     Log.d(
                         "VoiceRecognitionService",
@@ -152,7 +182,8 @@ class VoiceRecognitionService : Service() {
                 override fun onEvent(
                     eventType: Int,
                     params: Bundle?
-                ) {}
+                ) {
+                }
             }
         )
 
@@ -181,6 +212,10 @@ class VoiceRecognitionService : Service() {
             recognizerIntent
         )
     }
+
+    // ----------------------------------------------------
+    // ЗАПИСВАНЕ НА БЕЛЕЖКА
+    // ----------------------------------------------------
 
     private fun saveNote(
         text: String,
@@ -214,7 +249,8 @@ class VoiceRecognitionService : Service() {
                     "VoiceRecognitionService",
                     "Calendar event detected: " +
                             "${calendarEvent.title} - " +
-                            "${calendarEvent.startTime}"
+                            "${calendarEvent.startTime} - " +
+                            "allDay=${calendarEvent.allDay}"
                 )
 
                 showCalendarNotification(
@@ -226,13 +262,22 @@ class VoiceRecognitionService : Service() {
         }
     }
 
+    // ----------------------------------------------------
+    // РАЗПОЗНАВАНЕ НА ДАТА И ЧАС
+    // ----------------------------------------------------
+
     private fun parseCalendarEvent(
         originalText: String
     ): CalendarEvent? {
 
         val text =
             originalText
-                .lowercase(Locale("bg", "BG"))
+                .lowercase(
+                    Locale(
+                        "bg",
+                        "BG"
+                    )
+                )
                 .trim()
 
         val calendar =
@@ -240,15 +285,22 @@ class VoiceRecognitionService : Service() {
 
         var dateFound = false
 
+        // ------------------------------------------------
         // ДНЕС
+        // ------------------------------------------------
+
         if (
             Regex("\\bднес\\b")
                 .containsMatchIn(text)
         ) {
+
             dateFound = true
         }
 
+        // ------------------------------------------------
         // УТРЕ
+        // ------------------------------------------------
+
         if (
             Regex("\\bутре\\b")
                 .containsMatchIn(text)
@@ -262,7 +314,10 @@ class VoiceRecognitionService : Service() {
             dateFound = true
         }
 
-        // СЛЕДВАЩИЯ ПОНЕДЕЛНИК / ВТОРНИК...
+        // ------------------------------------------------
+        // ДНИ ОТ СЕДМИЦАТА
+        // ------------------------------------------------
+
         val weekdays =
             mapOf(
                 "понеделник" to Calendar.MONDAY,
@@ -273,6 +328,8 @@ class VoiceRecognitionService : Service() {
                 "събота" to Calendar.SATURDAY,
                 "неделя" to Calendar.SUNDAY
             )
+
+        // СЛЕДВАЩИЯ ПОНЕДЕЛНИК...
 
         val weekdayRegex =
             Regex(
@@ -313,7 +370,10 @@ class VoiceRecognitionService : Service() {
             }
         }
 
+        // ------------------------------------------------
         // В ПОНЕДЕЛНИК / ВЪВ ВТОРНИК...
+        // ------------------------------------------------
+
         if (!dateFound) {
 
             val simpleWeekdayRegex =
@@ -335,7 +395,9 @@ class VoiceRecognitionService : Service() {
                 if (targetDay != null) {
 
                     val currentDay =
-                        calendar.get(Calendar.DAY_OF_WEEK)
+                        calendar.get(
+                            Calendar.DAY_OF_WEEK
+                        )
 
                     var daysToAdd =
                         targetDay - currentDay
@@ -354,7 +416,10 @@ class VoiceRecognitionService : Service() {
             }
         }
 
-        // НА 12 СЕПТЕМВРИ
+        // ------------------------------------------------
+        // КОНКРЕТНА ДАТА - 12 СЕПТЕМВРИ
+        // ------------------------------------------------
+
         val months =
             mapOf(
                 "януари" to Calendar.JANUARY,
@@ -393,7 +458,8 @@ class VoiceRecognitionService : Service() {
 
             if (
                 day != null &&
-                month != null
+                month != null &&
+                day in 1..31
             ) {
 
                 val now =
@@ -412,6 +478,7 @@ class VoiceRecognitionService : Service() {
                 if (
                     calendar.before(now)
                 ) {
+
                     calendar.add(
                         Calendar.YEAR,
                         1
@@ -422,7 +489,10 @@ class VoiceRecognitionService : Service() {
             }
         }
 
+        // ------------------------------------------------
         // НА 12-ТИ
+        // ------------------------------------------------
+
         val dayOnlyRegex =
             Regex(
                 """\bна\s+(\d{1,2})(?:-?ти|-?ри|-?ви|-?ми)?\b"""
@@ -457,6 +527,7 @@ class VoiceRecognitionService : Service() {
                 if (
                     calendar.before(now)
                 ) {
+
                     calendar.add(
                         Calendar.MONTH,
                         1
@@ -472,10 +543,15 @@ class VoiceRecognitionService : Service() {
             }
         }
 
+        // ------------------------------------------------
+        // ЧАС
+        // ------------------------------------------------
+
         var hour: Int? = null
         var minute: Int? = null
 
         // 15:30
+
         val timeWithColon =
             Regex(
                 """(?:\bв\s+)?(\d{1,2}):(\d{2})\b"""
@@ -494,7 +570,35 @@ class VoiceRecognitionService : Service() {
                     .toIntOrNull()
         }
 
+        // ------------------------------------------------
+        // 15 И 30 / 15 ЧАСА И 30 МИНУТИ
+        // ------------------------------------------------
+
+        if (hour == null) {
+
+            val spokenNumericTime =
+                Regex(
+                    """\b(?:в\s+)?(\d{1,2})(?:\s*часа?)?\s+и\s+(\d{1,2})(?:\s*минути?)?\b"""
+                ).find(text)
+
+            if (spokenNumericTime != null) {
+
+                hour =
+                    spokenNumericTime
+                        .groupValues[1]
+                        .toIntOrNull()
+
+                minute =
+                    spokenNumericTime
+                        .groupValues[2]
+                        .toIntOrNull()
+            }
+        }
+
+        // ------------------------------------------------
         // В 9 ЧАСА
+        // ------------------------------------------------
+
         if (hour == null) {
 
             val numericHourMatch =
@@ -513,7 +617,10 @@ class VoiceRecognitionService : Service() {
             }
         }
 
+        // ------------------------------------------------
         // В ПЕТ И ПОЛОВИНА
+        // ------------------------------------------------
+
         if (hour == null) {
 
             val wordHours =
@@ -567,36 +674,69 @@ class VoiceRecognitionService : Service() {
             }
         }
 
-        if (
-            !dateFound ||
-            hour == null ||
-            minute == null
-        ) {
+        // ------------------------------------------------
+        // ТРЯБВА ДА ИМА ПОНЕ ДАТА
+        // ------------------------------------------------
+
+        if (!dateFound) {
 
             Log.d(
                 "VoiceRecognitionService",
-                "No complete calendar date/time detected"
+                "No calendar date detected"
             )
 
             return null
         }
 
-        if (
-            hour !in 0..23 ||
-            minute !in 0..59
-        ) {
-            return null
+        // ------------------------------------------------
+        // ДАТА + ЧАС ИЛИ САМО ДАТА
+        // ------------------------------------------------
+
+        val hasTime =
+            hour != null &&
+                    minute != null
+
+        if (hasTime) {
+
+            val eventHour =
+                hour ?: return null
+
+            val eventMinute =
+                minute ?: return null
+
+            if (
+                eventHour !in 0..23 ||
+                eventMinute !in 0..59
+            ) {
+
+                return null
+            }
+
+            calendar.set(
+                Calendar.HOUR_OF_DAY,
+                eventHour
+            )
+
+            calendar.set(
+                Calendar.MINUTE,
+                eventMinute
+            )
+
+        } else {
+
+            // Има дата, но няма час.
+            // Правим целодневно събитие.
+
+            calendar.set(
+                Calendar.HOUR_OF_DAY,
+                0
+            )
+
+            calendar.set(
+                Calendar.MINUTE,
+                0
+            )
         }
-
-        calendar.set(
-            Calendar.HOUR_OF_DAY,
-            hour
-        )
-
-        calendar.set(
-            Calendar.MINUTE,
-            minute
-        )
 
         calendar.set(
             Calendar.SECOND,
@@ -617,9 +757,15 @@ class VoiceRecognitionService : Service() {
                     "Drive Assistant"
                 },
             startTime =
-                calendar.timeInMillis
+                calendar.timeInMillis,
+            allDay =
+                !hasTime
         )
     }
+
+    // ----------------------------------------------------
+    // ПОЧИСТВАНЕ НА ЗАГЛАВИЕТО
+    // ----------------------------------------------------
 
     private fun cleanEventTitle(
         text: String
@@ -674,6 +820,13 @@ class VoiceRecognitionService : Service() {
 
             .replace(
                 Regex(
+                    """\b(?:в\s+)?\d{1,2}(?:\s*часа?)?\s+и\s+\d{1,2}(?:\s*минути?)?\b"""
+                ),
+                ""
+            )
+
+            .replace(
+                Regex(
                     """\bв\s+\d{1,2}\s*(?:часа|час)?\b"""
                 ),
                 ""
@@ -694,13 +847,34 @@ class VoiceRecognitionService : Service() {
             .trim()
     }
 
+    // ----------------------------------------------------
+    // NOTIFICATION ЗА КАЛЕНДАР
+    // ----------------------------------------------------
+
     private fun showCalendarNotification(
         event: CalendarEvent
     ) {
 
         val endTime =
-            event.startTime +
-                    60 * 60 * 1000
+            if (event.allDay) {
+
+                Calendar.getInstance().apply {
+
+                    timeInMillis =
+                        event.startTime
+
+                    add(
+                        Calendar.DAY_OF_MONTH,
+                        1
+                    )
+
+                }.timeInMillis
+
+            } else {
+
+                event.startTime +
+                        60 * 60 * 1000
+            }
 
         val calendarIntent =
             Intent(
@@ -725,6 +899,11 @@ class VoiceRecognitionService : Service() {
                 putExtra(
                     CalendarContract.Events.TITLE,
                     event.title
+                )
+
+                putExtra(
+                    CalendarContract.Events.ALL_DAY,
+                    event.allDay
                 )
             }
 
@@ -787,6 +966,10 @@ class VoiceRecognitionService : Service() {
         )
     }
 
+    // ----------------------------------------------------
+    // FOREGROUND NOTIFICATION
+    // ----------------------------------------------------
+
     private fun createNotification(): Notification {
 
         val channelId =
@@ -828,7 +1011,9 @@ class VoiceRecognitionService : Service() {
     }
 
     override fun onDestroy() {
+
         isListening.value = false
+
         speechRecognizer?.destroy()
         speechRecognizer = null
 
@@ -841,8 +1026,13 @@ class VoiceRecognitionService : Service() {
         intent: Intent?
     ): IBinder? = null
 
+    // ----------------------------------------------------
+    // КАЛЕНДАРНО СЪБИТИЕ
+    // ----------------------------------------------------
+
     private data class CalendarEvent(
         val title: String,
-        val startTime: Long
+        val startTime: Long,
+        val allDay: Boolean = false
     )
 }
